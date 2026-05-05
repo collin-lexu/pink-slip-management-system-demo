@@ -2,11 +2,15 @@ from flask import Flask, request, Response
 from flask_sqlalchemy import SQLAlchemy
 import pandas as pd
 import os
+from decimal import Decimal
+from dotenv import load_dotenv
 from sqlalchemy.exc import IntegrityError
+
+load_dotenv()
 
 app = Flask(__name__)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://postgres:pinkslip_password@localhost/pinks')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -21,10 +25,10 @@ class PinkSlip(db.Model):
     first_initial = db.Column(db.String(1), nullable=False)
     last_name = db.Column(db.String(30), nullable=False)
     phone = db.Column(db.String(16), nullable=False)
-    date_received = db.Column(db.String(10), nullable=False)
-    due_date = db.Column(db.String(10), nullable=False) # generally 14 day turn around
+    date_received = db.Column(db.Date, nullable=False)
+    due_date = db.Column(db.Date, nullable=False) # generally 14 day turn around
     due_time = db.Column(db.String(8), nullable=True) # due times usually range between 10am-6pm
-    total_amount = db.Column(db.Float, default=0.0, nullable=False)
+    total_amount = db.Column(db.Numeric(10, 2), default=Decimal('0.00'), nullable=False)
 
     items = db.relationship(
         'PinkSlipItem',
@@ -40,22 +44,17 @@ class PinkSlipItem(db.Model):
     slip_id = db.Column(db.Integer, db.ForeignKey('pink_slip.id'), nullable=False)
     item_type = db.Column(db.String(10), nullable=False)
     work_description = db.Column(db.String(100)) # if the item type is 'Other', the work description should include both the actual item and the work to be done
-    price = db.Column(db.Float, nullable=False)
+    price = db.Column(db.Numeric(10, 2), nullable=False)
 
 def _format_date_val(val):
-    if pd.isna(val) or val == '':
-        return ''
+    if not val or (isinstance(val, float) and pd.isna(val)) or str(val).strip() == '':
+        return None
     if isinstance(val, pd.Timestamp):
-        return val.strftime('%m/%d/%Y')
+        return val.date()
     try:
-        parsed = pd.to_datetime(val, format='%m/%d/%Y')
-        return parsed.strftime('%m/%d/%Y')
+        return pd.to_datetime(val).date()
     except Exception:
-        try:
-            parsed = pd.to_datetime(val)
-            return parsed.strftime('%m/%d/%Y')
-        except Exception:
-            return str(val)[:10]
+        return None
 
 def _parse_time(val):
     if not val or pd.isna(val) or str(val).strip() == '':
@@ -285,13 +284,7 @@ def upload():
 
     # recalculate totals
     for pink_slip in slips_cache.values():
-        total = 0.0
-        for it in pink_slip.items:
-            try:
-                total += float(it.price)
-            except Exception:
-                continue
-        pink_slip.total_amount = total
+        pink_slip.total_amount = sum(it.price for it in pink_slip.items)
         db.session.add(pink_slip)
 
     try:
@@ -369,7 +362,7 @@ def records():
     for t in slips:
         html += (
             f"<h2>Slip: {t.slip_number} | Customer: {t.first_initial}. {t.last_name} | Phone: {t.phone}</h2>"
-            f"<p>Date Received: {t.date_received or 'N/A'} | Due: {t.due_date or 'N/A'}"
+            f"<p>Date Received: {t.date_received.strftime('%m/%d/%Y') if t.date_received else 'N/A'} | Due: {t.due_date.strftime('%m/%d/%Y') if t.due_date else 'N/A'}"
             f"{(' at ' + t.due_time) if t.due_time else ''} | Total: ${t.total_amount:.2f}</p>"
         )
         html += "<ul>"
