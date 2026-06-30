@@ -26,8 +26,9 @@ class PinkSlip(db.Model):
     last_name = db.Column(db.String(30), nullable=False)
     phone = db.Column(db.String(16), nullable=False)
     date_received = db.Column(db.Date, nullable=False)
-    due_date = db.Column(db.Date, nullable=False) # generally 14 day turn around
+    due_date = db.Column(db.Date, nullable=False) # generally 14 day turn around unless rush fee is applied
     due_time = db.Column(db.String(8), nullable=True) # due times usually range between 10am-6pm
+    rush_fee = db.Column(db.Numeric(10, 2), default=Decimal('0.00'), nullable=False) # rush fee total is calculated and inputted manually if applicable, otherwise it is $0.00
     total_amount = db.Column(db.Numeric(10, 2), default=Decimal('0.00'), nullable=False)
 
     items = db.relationship(
@@ -85,6 +86,18 @@ def _format_phone(phone_str):
         digits = digits[1:]
         return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
     return str(phone_str).strip()
+
+def _parse_rush_fee(val):
+    if val is None or (isinstance(val, float) and pd.isna(val)) or str(val).strip() == '':
+        return Decimal('0.00')
+    cleaned = str(val).strip().replace('$', '').replace(',', '')
+    try:
+        fee = Decimal(cleaned)
+        if fee < 0:
+            return Decimal('0.00')
+        return fee
+    except Exception:
+        return Decimal('0.00')
 
 VALID_ITEM_TYPES = ['Shirt', 'Jeans', 'Dress', 'Jacket', 'Coat', 'Pants', 'Skirt', 'Shorts', 'Other']
 
@@ -181,6 +194,7 @@ def upload():
         date_received_raw = row.get('date_received', '')
         due_date_raw = row.get('due_date', '')
         due_time_raw = row.get('due_time', '')
+        rush_fee_raw = row.get('rush_fee', '')
 
         if not slip_number:
             rows_skipped += 1
@@ -240,6 +254,7 @@ def upload():
                     date_received=date_received,
                     due_date=due_date,
                     due_time=due_time,
+                    rush_fee=_parse_rush_fee(rush_fee_raw),
                     total_amount=0.0
                 )
                 db.session.add(pink_slip)
@@ -258,6 +273,8 @@ def upload():
                     pink_slip.due_date = due_date
                 if due_time and not pink_slip.due_time:
                     pink_slip.due_time = due_time
+                if rush_fee_raw and pink_slip.rush_fee == 0:
+                    pink_slip.rush_fee = _parse_rush_fee(rush_fee_raw)
             slips_cache[slip_number] = pink_slip
 
         # skip duplicate items on the same slip
@@ -284,7 +301,7 @@ def upload():
 
     # recalculate totals
     for pink_slip in slips_cache.values():
-        pink_slip.total_amount = sum(it.price for it in pink_slip.items)
+        pink_slip.total_amount = Decimal(str(sum(it.price for it in pink_slip.items))) + pink_slip.rush_fee
         db.session.add(pink_slip)
 
     try:
@@ -365,6 +382,8 @@ def records():
             f"<p>Date Received: {t.date_received.strftime('%m/%d/%Y') if t.date_received else 'N/A'} | Due: {t.due_date.strftime('%m/%d/%Y') if t.due_date else 'N/A'}"
             f"{(' at ' + t.due_time) if t.due_time else ''} | Total: ${t.total_amount:.2f}</p>"
         )
+        if t.rush_fee and t.rush_fee > 0:
+            html += f"<p><b>Rush Fee: ${t.rush_fee:.2f}</b></p>"
         html += "<ul>"
         for it in t.items:
             desc = f" - {it.work_description}" if it.work_description else ""
@@ -398,6 +417,17 @@ def add_pink_slip():
         date_received = _format_date_val(request.form.get("date_received", ""))
         due_date = _format_date_val(request.form.get("due_date", ""))
         due_time = _parse_time(request.form.get("due_time", ""))
+        rush_fee_raw = request.form.get("rush_fee", "").strip()
+        rush_fee_clean = rush_fee_raw.replace('$', '').replace(',', '')
+        if rush_fee_clean:
+            try:
+                rush_fee = Decimal(rush_fee_clean)
+                if rush_fee < 0:
+                    raise ValueError
+            except Exception:
+                return "Invalid rush fee. Must be a positive number.", 400
+        else:
+            rush_fee = Decimal('0.00')
 
         item_types_raw = request.form.getlist("item_type")
         work_descriptions = request.form.getlist("work_description")
@@ -430,6 +460,7 @@ def add_pink_slip():
                 date_received=date_received,
                 due_date=due_date,
                 due_time=due_time,
+                rush_fee=rush_fee,
                 total_amount=0.0
             )
             db.session.add(pink_slip)
@@ -443,7 +474,7 @@ def add_pink_slip():
             )
             db.session.add(item)
 
-        pink_slip.total_amount = sum(it.price for it in pink_slip.items)
+        pink_slip.total_amount = Decimal(str(sum(it.price for it in pink_slip.items))) + pink_slip.rush_fee
         db.session.commit()
 
         return f"Pink slip {slip_number} added successfully with {len(validated_items)} item(s)! <a href='/records'>View Records</a>"
@@ -462,6 +493,7 @@ def add_pink_slip():
             Date Received: <input type="date" name="date_received" required><br>
             Due Date: <input type="date" name="due_date" required><br>
             Due Time: <input type="time" name="due_time"><br>
+            Rush Fee: <input type="text" name="rush_fee" inputmode="decimal" placeholder="0.00" oninput="this.value=this.value.replace(/[^0-9.]/g,'')"><br>
         </fieldset>
         <fieldset>
             <legend>Items</legend>
@@ -507,7 +539,7 @@ def export():
     merged = items_df.merge(slips_df, left_on='slip_id', right_on='id', suffixes=('_item', '_slip'))
     export_df = merged[['slip_number', 'first_initial', 'last_name', 'phone',
                          'date_received', 'due_date', 'due_time', 'item_type',
-                         'work_description', 'price', 'total_amount']]
+                         'work_description', 'price', 'rush_fee', 'total_amount']]
 
     csv_data = export_df.to_csv(index=False)
     return Response(csv_data, mimetype='text/csv',
