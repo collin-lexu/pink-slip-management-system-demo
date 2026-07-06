@@ -43,6 +43,7 @@ class PinkSlipItem(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     slip_id = db.Column(db.Integer, db.ForeignKey('pink_slip.id'), nullable=False)
+    item_number = db.Column(db.Integer, nullable=True) # position of this item on its slip; distinguishes otherwise-identical items so imports don't misdetect them as duplicates
     item_type = db.Column(db.String(10), nullable=False)
     work_description = db.Column(db.String(100)) # if the item type is 'Other', the work description should include both the actual item and the work to be done
     price = db.Column(db.Numeric(10, 2), nullable=False)
@@ -191,6 +192,7 @@ def upload():
         item_type_raw = str(row.get('item_type', '')).strip()
         work_description = str(row.get('work_description', '')).strip()
         price_raw = str(row.get('price', '')).strip().replace('$', '').replace(',', '')
+        item_number_raw = str(row.get('item_number', '')).strip()
         date_received_raw = row.get('date_received', '')
         due_date_raw = row.get('due_date', '')
         due_time_raw = row.get('due_time', '')
@@ -234,6 +236,11 @@ def upload():
                 "error": "Negative price not allowed"
             })
             continue
+
+        try:
+            item_number = int(item_number_raw) if item_number_raw else None
+        except ValueError:
+            item_number = None
 
         date_received = _format_date_val(date_received_raw)
         due_date = _format_date_val(due_date_raw)
@@ -280,7 +287,8 @@ def upload():
         # skip duplicate items on the same slip
         duplicate_found = False
         for existing_item in pink_slip.items:
-            if (existing_item.item_type == item_type and
+            if (existing_item.item_number == item_number and
+                existing_item.item_type == item_type and
                 (existing_item.work_description or '') == (work_description or '') and
                 float(existing_item.price) == float(price)):
                 duplicate_found = True
@@ -292,6 +300,7 @@ def upload():
 
         item = PinkSlipItem(
             slip=pink_slip,
+            item_number=item_number,
             item_type=item_type,
             work_description=work_description,
             price=price
@@ -465,9 +474,11 @@ def add_pink_slip():
             )
             db.session.add(pink_slip)
 
-        for item_type, work_description, price in validated_items:
+        next_item_number = max((it.item_number or 0) for it in pink_slip.items) if pink_slip.items else 0
+        for i, (item_type, work_description, price) in enumerate(validated_items, start=next_item_number + 1):
             item = PinkSlipItem(
                 slip=pink_slip,
+                item_number=i,
                 item_type=item_type,
                 work_description=work_description,
                 price=price
