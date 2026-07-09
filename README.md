@@ -4,7 +4,7 @@ A data analysis project built for Anna's Alterations. The web application digiti
 
 ## Live Demos
 
-- **Web App:** [pinkslipdemo.pythonanywhere.com](https://pinkslipdemo.pythonanywhere.com)
+- **Web App:** [pinkslip.pythonanywhere.com](https://pinkslip.pythonanywhere.com)
 - **Tableau Dashboard:** [Anna's Alterations Dashboard](https://public.tableau.com/views/annas-alterations-dashboard/Dashboard?:language=en-US&:sid=&:redirect=auth&:display_count=n&:origin=viz_share_link)
 
 > This demo uses synthetic sample data spanning 2022 to 2024, simulating realistic order volume, seasonal trends, and customer behavior. All names, phone numbers, and customer details are randomly generated.
