@@ -1,13 +1,13 @@
 # Pink Slip Management System
 
-A data analysis project built for Anna's Alterations. The web application digitizes paper-based order records through data entry and bulk import, with the primary goal of enabling SQL and Tableau analysis of revenue trends, customer behavior, and seasonal demand.
+Anna's Alterations tracked customer orders using handwritten paper pink slips, making it difficult to analyze business performance or identify operational trends. I built a Flask web application to digitize these records and created SQL, pandas, and Tableau analyses to answer questions about revenue, customer retention, seasonal demand, and customer behavior.
 
 ## Live Demos
 
 - **Web App:** [pinkslip.pythonanywhere.com](https://pinkslip.pythonanywhere.com)
 - **Tableau Dashboard:** [Anna's Alterations Dashboard](https://public.tableau.com/views/annas-alterations-dashboard/Dashboard?:language=en-US&:sid=&:redirect=auth&:display_count=n&:origin=viz_share_link)
 
-> This demo uses synthetic sample data spanning 2022 to 2024, simulating realistic order volume, seasonal trends, and customer behavior. All names, phone numbers, and customer details are randomly generated.
+> This public demo uses a synthetically generated dataset. The sample data preserves realistic ordering patterns, pricing, and customer behavior so the application's features and analyses can be demonstrated while protecting customer privacy and keeping the shop's internal records private. All names, phone numbers, and customer details are randomly generated.
 
 ## Features
 
@@ -20,17 +20,6 @@ A data analysis project built for Anna's Alterations. The web application digiti
 ### Data Analysis
 - **Jupyter notebooks:** `analysis.ipynb` explores customer behavior, revenue trends, and seasonal demand with pandas and matplotlib. `sql_analysis.ipynb` covers the same ground with raw SQL queries.
 - **Tableau dashboard:** Interactive visual summaries of key business metrics.
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Backend | Python, Flask, Flask-SQLAlchemy |
-| Database | PostgreSQL |
-| Data processing | pandas, openpyxl |
-| Analysis | Jupyter, SQL |
-| Visualization | Tableau |
-| Database tooling | DBeaver |
 
 ## Analysis Highlights
 
@@ -47,7 +36,7 @@ Total revenue across the sample period was $2,050,464, averaging $39.36 per slip
 ### Item Type: Volume vs. Revenue
 ![Volume vs. Revenue](images/volume_vs_revenue.png)
 
-Jackets, dresses, and coats are the top three categories by revenue (22.3%, 19.7%, and 17.2%), together driving 59.2% of item revenue, however that ranking doesn't match item volume. Pants are the single most common item processed (18.0% of volume) yet rank fourth in revenue (12.6%), reflecting simpler and lower-cost alterations such as hemming. Coats sit at the other end of the spectrum at only 9.8% of volume but the highest average price of any category as it is consistent with more complex and labor-intensive work like relining or structural tailoring.
+Jackets, dresses, and coats are the top three categories by revenue (22.3%, 19.7%, and 17.2%), together driving 59.2% of item revenue, however that ranking doesn't match item volume. Pants are the single most common item processed (18.0% of volume) yet rank fourth in revenue (12.6%), reflecting simpler and cheaper alterations such as hemming. Coats sit at the other end of the spectrum at only 9.8% of volume but the highest average price of any category as it is consistent with more complex work like relining or structural tailoring.
 
 ### Customer Segments
 ![Customer Segments](images/customer_segments.png)
@@ -57,7 +46,7 @@ Customer value is heavily concentrated at the top. The 32.1% of customers who vi
 ### Seasonal Demand by Month
 ![Seasonal Demand Bar Chart](images/seasonal_bar_chart.png)
 
-Order volume averages 1,447/month, with a spring peak (April-June) running 28% above average and a smaller fall peak (September-November) at 11% above average. Spring likely reflects wedding and prom/graduation season, while fall lines up with back-to-school, holiday prep, and cold-weather wardrobe changes. Staffing and supplies could be timed to match, stocking up on wedding-related alteration supplies before spring and coat and winter-wear supplies before fall. The slower Jan/Feb and Jul/Aug months could be used for reminder outreach to lapsed customers to help smooth out demand, though this would require opt-in consent for promotional contact since phone numbers are currently collected for order-related purposes only.
+Order volume averages 1,447/month, with a spring peak (April-June) running 28% above average and a smaller fall peak (September-November) at 11% above average. Spring likely reflects wedding and prom/graduation season, while fall lines up with back-to-school, holiday prep, and winter wardrobe changes. Staffing and supplies could be timed to match, stocking up on wedding-related alteration supplies before spring and coat and winter-wear supplies before fall. The slower Jan/Feb and Jul/Aug months could be used for reminder outreach to lapsed customers to help smooth out demand, though this would require opt-in consent for promotional contact since phone numbers are currently collected for contact and order related purposes only.
 
 ![Seasonal Demand Heatmap](images/seasonal_heatmap.png)
 
@@ -66,7 +55,9 @@ This pattern holds across all three years which shows a structural seasonal rhyt
 ### Cohort Retention
 ![Cohort Retention Heatmap](images/cohort_retention.png)
 
-Customers grouped by the month of their first visit, tracking what percentage returned in that month or any later month. Average month-1 retention is 19.4%, dropping to 16.6% by month 6 and 13.0% by month 12. The steepest drop-off happens right after the first visit, and customers who don't return within that first month rarely return at all, making early outreach the highest-leverage window for retention efforts. Retention also varies by cohort in which customers acquired in Q1 (Jan-Mar) retained best at 24-26% by month 1, while July and November acquisitions retained worst at 14.8-15.1%, with the gap holding out to month 12.
+Customers grouped by the month of their first visit, tracking what percentage returned in that month or any later month. Average month-1 retention is 19.4%, dropping to 16.6% by month 6 and 13.0% by month 12. The steepest drop-off happens right after the first visit, and customers who don't return within that first month rarely return at all, making early outreach the highest leverage window for retention efforts.
+
+Retention also varies by cohort: customers acquired in Q1 (Jan-Mar) retained best at 24-26% by month 1, while July and November acquisitions retained worst at 14.8-15.1%, and the gap holds out to month 12. A chi-square test of independence confirms this spread is statistically real rather than random noise (chi2 = 28.90, df = 11, p = 0.002). However, the effect size is small (Cramer's V = 0.079), meaning cohort alone explains only a modest share of overall retention variance, but the roughly 10 point gap between the best and worst cohorts is still large enough to be worth targeting directly, rather than treating all acquisition months the same for outreach.
 
 ### Rush Rate
 ![Rush Rate Bar Chart](images/rush_rate.png)
@@ -75,7 +66,36 @@ Rush rate is the percent of orders in a month that have a rush fee applied. Dece
 
 ![Rush Rate Heatmap](images/rush_rate_heatmap.png)
 
-Breaking the rate down by year confirms it's a stable pattern rather than noise where December ranges 22.8-24.9% and February 7.6-9.2% across all three years. The rest of the year moves in a narrower band (roughly 9-16%), so the holiday rush and the February dip are the two real outliers worth planning around.
+Breaking the rate down by year confirms it's a stable pattern rather than noise where December ranges 22.8-24.9% and February 7.6-9.2% across all three years. The rest of the year moves in a narrower band (roughly 9-16%), so the holiday rush and the February dip are the two real outliers worth planning around. A chi-square test of independence backs this up (chi2 = 708.0, df = 11, p < 0.001, Cramer's V = 0.12), confirming rush rate genuinely varies by month. The relationship is modest in strength, however, so other factors likely explain more of the variation in any single order's rush status than month alone.
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Python, Flask, Flask-SQLAlchemy |
+| Database | PostgreSQL |
+| Data processing | pandas, openpyxl |
+| Analysis | Jupyter, SQL |
+| Visualization | Tableau |
+| Database tooling | DBeaver |
+
+## Architecture
+
+The project follows a simple pipeline that transforms handwritten order records into structured data for analysis.
+
+```text
+Paper Pink Slips
+      ↓
+Flask Web Application
+      ↓
+PostgreSQL Database
+      ↓
+SQL + pandas Analysis
+      ↓
+Tableau Dashboard
+```
+
+Paper records are entered through the Flask web application using manual data entry or bulk CSV/Excel import. The application validates and stores the data in a normalized PostgreSQL database, which serves as the source for SQL queries, pandas notebooks, and the Tableau dashboard.
 
 ## Data Model
 
